@@ -165,10 +165,15 @@ function drawMandala(t) {
       cx + Math.cos(angle) * len,
       cy + Math.sin(angle) * len
     );
+let intensity = Math.min(sRMS * 1.5, 1); // 0 → 1
 
-    ctx.strokeStyle = `hsl(${sHue},90%,60%)`;
-    ctx.lineWidth = 2 + sMid * 4;
-    ctx.stroke();
+let red = 255;
+let green = Math.floor(255 * (1 - intensity));
+let blue = Math.floor(255 * (1 - intensity));
+
+ctx.strokeStyle = `rgb(${red}, ${green}, ${blue})`;
+ctx.lineWidth = 2 + sRMS * 5;
+ctx.stroke();
   }
 }
 </script>
