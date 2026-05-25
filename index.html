@@ -4,74 +4,76 @@
 <head>
 
 <meta charset="UTF-8">
-
-<title>Molten Gold Voice Engine</title>
+<title>Molten Gold Voice Visualizer</title>
 
 <style>
 
 html,body{
-
 margin:0;
+padding:0;
 overflow:hidden;
 background:#000;
 height:100%;
-
 font-family:Arial,sans-serif;
-
 }
 
 canvas{
-
 display:block;
-
 }
 
-#panel{
+#ui{
 
 position:absolute;
-left:40px;
-top:40px;
-color:#d4af37;
+top:35px;
+left:35px;
 z-index:100;
-
-opacity:.9;
+color:#d4af37;
 
 }
 
 h1{
 
-font-weight:200;
-letter-spacing:8px;
 margin:0;
-
-font-size:40px;
+font-weight:200;
+font-size:38px;
+letter-spacing:10px;
 
 }
 
-.small{
+#subtitle{
 
-font-size:12px;
-letter-spacing:4px;
+margin-top:10px;
+font-size:11px;
 opacity:.6;
+letter-spacing:4px;
 
 }
 
 button{
 
-margin-top:30px;
+margin-top:25px;
+
+padding:14px 25px;
 
 background:transparent;
-color:#d4af37;
 
 border:1px solid rgba(212,175,55,.5);
 
-padding:15px 25px;
+color:#d4af37;
 
 cursor:pointer;
 
 font-size:12px;
 
-letter-spacing:2px;
+letter-spacing:3px;
+
+transition:.3s;
+
+}
+
+button:hover{
+
+background:rgba(212,175,55,.15);
 
 }
 
@@ -81,17 +83,17 @@ letter-spacing:2px;
 
 <body>
 
-<div id="panel">
+<div id="ui">
 
-<h1>VOICE PATTERN</h1>
+<h1>MOLTEN GOLD</h1>
 
-<div class="small">
+<div id="subtitle">
 
-WEB AUDIO / MOLTEN GOLD ENGINE
+VOICE REACTIVE LIQUID METAL
 
 </div>
 
-<button id="mic">
+<button id="startBtn">
 
 ACTIVATE MIC
 
@@ -99,26 +101,30 @@ ACTIVATE MIC
 
 </div>
 
-
-<canvas id="c"></canvas>
-
+<canvas id="canvas"></canvas>
 
 <script>
 
 const canvas=
-document.getElementById("c");
+document.getElementById(
+"canvas"
+);
 
 const ctx=
-canvas.getContext("2d");
+canvas.getContext(
+"2d"
+);
 
 let W,H;
 
 function resize(){
 
-W=canvas.width=
+W=
+canvas.width=
 window.innerWidth;
 
-H=canvas.height=
+H=
+canvas.height=
 window.innerHeight;
 
 }
@@ -131,22 +137,27 @@ resize
 );
 
 
+// AUDIO
+
 let analyser;
-let data;
+let freqData;
 
 
 document.getElementById(
-"mic"
+"startBtn"
 )
-.onclick=
+.addEventListener(
+"click",
 async()=>{
 
-
 const stream=
+
 await navigator
 .mediaDevices
 .getUserMedia({
+
 audio:true
+
 });
 
 const audioCtx=
@@ -156,11 +167,17 @@ analyser=
 audioCtx
 .createAnalyser();
 
-analyser.fftSize=2048;
+analyser.fftSize=
+2048;
 
-data=
+analyser.smoothingTimeConstant=
+0.85;
+
+freqData=
 new Uint8Array(
+
 analyser.frequencyBinCount
+
 );
 
 const source=
@@ -173,34 +190,46 @@ source.connect(
 analyser
 );
 
-};
+}
+);
 
 
-function getAudio(){
 
-if(!analyser)
+function getAudioData(){
+
+if(!analyser){
+
 return{
+
 vol:0,
-bass:0
+bass:0,
+treble:0
+
 };
+
+}
 
 analyser.getByteFrequencyData(
-data
+freqData
 );
+
 
 let vol=0;
 let bass=0;
+let treble=0;
 
 
 for(
 let i=0;
-i<data.length;
+i<freqData.length;
 i++
 ){
 
-vol+=data[i];
+vol+=
+freqData[i];
 
 }
+
 
 for(
 let i=0;
@@ -208,78 +237,59 @@ i<40;
 i++
 ){
 
-bass+=data[i];
+bass+=
+freqData[i];
 
 }
 
+
+for(
+let i=200;
+i<500;
+i++
+){
+
+treble+=
+freqData[i];
+
+}
+
+
 vol/=
-data.length*255;
+freqData.length
+*
+255;
 
 bass/=
-40*255;
+40
+*
+255;
+
+treble/=
+300
+*
+255;
+
 
 return{
+
 vol,
-bass
+bass,
+treble
+
 };
 
 }
 
 
 
-const blobs=[];
-
-for(
-let i=0;
-i<12;
-i++
-){
-
-blobs.push({
-
-angle:
-Math.random()
-*
-Math.PI
-*
-2,
-
-orbit:
-100+
-Math.random()
-*
-220,
-
-size:
-50+
-Math.random()
-*
-70,
-
-speed:
-(
-Math.random()
--
-.5
-)
-*
-.01,
-
-offset:
-Math.random()
-*
-1000
-
-});
-
-}
-
+// floating particles
 
 const particles=[];
 
 for(
 let i=0;
-i<150;
+i<60;
 i++
 ){
 
@@ -287,17 +297,25 @@ particles.push({
 
 x:
 Math.random()
-*W,
+*
+window.innerWidth,
 
 y:
 Math.random()
-*H,
+*
+window.innerHeight,
 
 size:
-Math.random()*4,
+Math.random()
+*
+4
++
+1,
 
 speed:
-Math.random()*1.5
+Math.random()
+*
+1.5
 
 });
 
@@ -308,20 +326,351 @@ Math.random()*1.5
 let t=0;
 
 
-function render(){
 
-requestAnimationFrame(
-render
+function drawGold(
+cx,
+cy,
+audio
+){
+
+ctx.save();
+
+ctx.shadowBlur=
+90;
+
+ctx.shadowColor=
+"#ffcc44";
+
+
+let baseR=
+
+Math.min(
+W,
+H
+)
+*
+0.22;
+
+
+
+let gradient=
+
+ctx.createRadialGradient(
+
+cx-baseR*.5,
+cy-baseR*.5,
+0,
+
+cx,
+cy,
+baseR*2
+
 );
 
-t+=.01;
+
+// Gold material
+
+gradient.addColorStop(
+0,
+"#ffffff"
+);
+
+gradient.addColorStop(
+0.06,
+"#fff9d7"
+);
+
+gradient.addColorStop(
+0.18,
+"#ffe082"
+);
+
+gradient.addColorStop(
+0.35,
+"#ffd700"
+);
+
+gradient.addColorStop(
+0.55,
+"#d4af37"
+);
+
+gradient.addColorStop(
+0.8,
+"#7c5a00"
+);
+
+gradient.addColorStop(
+1,
+"#120700"
+);
 
 
-const audio=
-getAudio();
+ctx.fillStyle=
+gradient;
 
 
-// background fade
+ctx.beginPath();
+
+
+const points=
+400;
+
+
+for(
+let i=0;
+i<=points;
+i++
+){
+
+let angle=
+
+(i/points)
+*
+Math.PI
+*
+2;
+
+
+// primary shape
+
+let wave1=
+
+Math.sin(
+angle*3+
+t*2
+)
+*
+(
+25+
+audio.bass*120
+);
+
+
+// secondary detail
+
+let wave2=
+
+Math.sin(
+angle*8+
+t*5
+)
+*
+(
+10+
+audio.vol*60
+);
+
+
+// stretched liquid
+
+let stretch=
+
+Math.cos(
+angle*2-
+t
+)
+*
+(
+50+
+audio.bass*150
+);
+
+
+// drips
+
+let drip=
+
+Math.max(
+
+0,
+
+Math.sin(
+angle*7+
+t*4
+)
+
+)
+
+*
+audio.vol
+*
+100;
+
+
+let r=
+
+baseR+
+
+wave1+
+
+wave2+
+
+stretch+
+
+drip;
+
+
+let x=
+
+cx+
+
+Math.cos(
+angle
+)
+*
+r;
+
+
+let y=
+
+cy+
+
+Math.sin(
+angle
+)
+*
+r;
+
+
+
+if(i===0){
+
+ctx.moveTo(
+x,
+y
+);
+
+}
+else{
+
+ctx.lineTo(
+x,
+y
+);
+
+}
+
+}
+
+ctx.closePath();
+
+ctx.fill();
+
+
+
+// reflective metallic streak
+
+ctx.beginPath();
+
+ctx.strokeStyle=
+"rgba(255,255,255,.6)";
+
+ctx.lineWidth=
+10;
+
+
+ctx.moveTo(
+
+cx-baseR*.6,
+
+cy-baseR*.35
+
+);
+
+ctx.quadraticCurveTo(
+
+cx,
+
+cy-baseR*.8,
+
+cx+baseR*.5,
+
+cy-baseR*.2
+
+);
+
+ctx.stroke();
+
+
+
+// droplets
+
+for(
+let i=0;
+i<25;
+i++
+){
+
+let a=
+i*.4+t;
+
+let d=
+baseR+
+Math.sin(
+t+i
+)
+*
+120;
+
+
+let x=
+
+cx+
+Math.cos(a)
+*d;
+
+
+let y=
+
+cy+
+Math.sin(a)
+*d;
+
+
+ctx.beginPath();
+
+ctx.fillStyle=
+"#ffd24d";
+
+ctx.arc(
+
+x,
+y,
+
+2+
+audio.treble*8,
+
+0,
+Math.PI*2
+
+);
+
+ctx.fill();
+
+}
+
+
+ctx.restore();
+
+}
+
+
+
+function animate(){
+
+requestAnimationFrame(
+animate
+);
+
+t+=0.01;
+
+
+let audio=
+getAudioData();
+
+
+// smooth trail effect
 
 ctx.fillStyle=
 "rgba(0,0,0,.08)";
@@ -334,202 +683,18 @@ H
 );
 
 
-// metallic liquid body
+// center sculpture
 
-ctx.globalCompositeOperation=
-"lighter";
+drawGold(
 
-
-for(
-let b of blobs
-){
-
-
-b.angle+=
-b.speed*
-(
-1+
-audio.bass*6
-);
-
-
-let x=
-
-W/2+
-
-Math.cos(
-b.angle
-)
-*
-b.orbit;
-
-
-let y=
-
-H/2+
-
-Math.sin(
-b.angle
-)
-*
-b.orbit;
-
-
-let r=
-
-b.size+
-
-Math.sin(
-
-t*4+
-
-b.offset
-
-)
-
-*
-
-(
-30+
-audio.vol*100
-);
-
-
-
-let g=
-
-ctx.createRadialGradient(
-
-x-r*.4,
-y-r*.4,
-0,
-
-x,
-y,
-r
+W/2,
+H/2,
+audio
 
 );
 
 
-// realistic gold
-
-g.addColorStop(
-0,
-"#ffffff"
-);
-
-g.addColorStop(
-0.08,
-"#fff4d6"
-);
-
-g.addColorStop(
-0.25,
-"#ffe082"
-);
-
-g.addColorStop(
-0.5,
-"#d4af37"
-);
-
-g.addColorStop(
-0.7,
-"#8a6500"
-);
-
-g.addColorStop(
-1,
-"#120800"
-);
-
-
-
-ctx.shadowBlur=
-100;
-
-ctx.shadowColor=
-"#ffcf40";
-
-ctx.fillStyle=
-g;
-
-
-ctx.beginPath();
-
-for(
-let a=0;
-a<
-Math.PI*2;
-a+=.06
-){
-
-let wave=
-
-Math.sin(
-
-a*7+
-
-t*4+
-
-b.offset
-
-)
-
-*
-
-(
-25+
-audio.bass*100
-);
-
-
-let rr=
-r+wave;
-
-
-let px=
-x+
-Math.cos(a)
-*
-rr;
-
-
-let py=
-y+
-Math.sin(a)
-*
-rr;
-
-
-if(a===0){
-
-ctx.moveTo(
-px,
-py
-);
-
-}
-else{
-
-ctx.lineTo(
-px,
-py
-);
-
-}
-
-}
-
-
-ctx.closePath();
-
-ctx.fill();
-
-}
-
-
-// floating droplets
+// particles
 
 for(
 let p of particles
@@ -539,23 +704,25 @@ p.y+=
 p.speed+
 audio.vol*3;
 
+
 if(
 p.y>
 H
 ){
 
 p.y=0;
+
 p.x=
 Math.random()
-*
-W;
+*W;
 
 }
+
 
 ctx.beginPath();
 
 ctx.fillStyle=
-"rgba(255,220,100,.8)";
+"rgba(255,215,0,.7)";
 
 ctx.arc(
 
@@ -565,7 +732,6 @@ p.y,
 p.size,
 
 0,
-
 Math.PI*2
 
 );
@@ -574,49 +740,12 @@ ctx.fill();
 
 }
 
-
-ctx.globalCompositeOperation=
-"source-over";
-
-
-// reflective floor
-
-let reflection=
-
-ctx.createLinearGradient(
-0,
-H*.6,
-0,
-H
-);
-
-reflection.addColorStop(
-0,
-"rgba(255,180,0,.15)"
-);
-
-reflection.addColorStop(
-1,
-"transparent"
-);
-
-ctx.fillStyle=
-reflection;
-
-ctx.fillRect(
-0,
-H*.6,
-W,
-H
-);
-
 }
 
 
-render();
+animate();
 
 </script>
 
 </body>
-
 </html>
