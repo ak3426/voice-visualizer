@@ -1,182 +1,622 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
-<title>Voice Visualizer</title>
 
-<!-- Fonts -->
+<title>Molten Gold Voice Engine</title>
+
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600&family=Playfair+Display:wght@400;700&display=swap');
 
-body {
-  margin: 0;
-  overflow: hidden;
-  background: #020b18; /* softer background */
-  font-family: 'Space Grotesk', sans-serif;
+html,body{
+
+margin:0;
+overflow:hidden;
+background:#000;
+height:100%;
+
+font-family:Arial,sans-serif;
+
 }
 
-#controls {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
+canvas{
+
+display:block;
+
 }
 
-button {
-  margin: 5px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255,255,255,0.4);
-  background: transparent;
-  color: white;
-  cursor: pointer;
+#panel{
+
+position:absolute;
+left:40px;
+top:40px;
+color:#d4af37;
+z-index:100;
+
+opacity:.9;
+
 }
 
-h1 {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  color: rgba(255,255,255,0.7);
-  font-family: 'Playfair Display', serif;
+h1{
+
+font-weight:200;
+letter-spacing:8px;
+margin:0;
+
+font-size:40px;
+
 }
+
+.small{
+
+font-size:12px;
+letter-spacing:4px;
+opacity:.6;
+
+}
+
+button{
+
+margin-top:30px;
+
+background:transparent;
+color:#d4af37;
+
+border:1px solid rgba(212,175,55,.5);
+
+padding:15px 25px;
+
+cursor:pointer;
+
+font-size:12px;
+
+letter-spacing:2px;
+
+}
+
 </style>
+
 </head>
 
 <body>
 
-<h1>VOICE VISUALIZER</h1>
+<div id="panel">
+
+<h1>VOICE PATTERN</h1>
+
+<div class="small">
+
+WEB AUDIO / MOLTEN GOLD ENGINE
+
+</div>
+
+<button id="mic">
+
+ACTIVATE MIC
+
+</button>
+
+</div>
+
 
 <canvas id="c"></canvas>
 
-<div id="controls">
-  <button data-mode="0">Lissajous</button>
-  <button data-mode="1">Mandala</button>
-  <button id="start">Activate Mic</button>
-</div>
 
 <script>
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
 
-let W, H;
-function resize() {
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
+const canvas=
+document.getElementById("c");
+
+const ctx=
+canvas.getContext("2d");
+
+let W,H;
+
+function resize(){
+
+W=canvas.width=
+window.innerWidth;
+
+H=canvas.height=
+window.innerHeight;
+
 }
-window.addEventListener("resize", resize);
+
 resize();
 
-let analyser, dataArray, timeData;
-let running = false;
-let mode = 0;
+window.addEventListener(
+"resize",
+resize
+);
 
-// AUDIO SETUP
-document.getElementById("start").onclick = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const audioCtx = new AudioContext();
-  const source = audioCtx.createMediaStreamSource(stream);
 
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 4096;
-  analyser.smoothingTimeConstant = 0.85;
+let analyser;
+let data;
 
-  source.connect(analyser);
 
-  dataArray = new Uint8Array(analyser.frequencyBinCount);
-  timeData = new Uint8Array(analyser.fftSize);
+document.getElementById(
+"mic"
+)
+.onclick=
+async()=>{
 
-  running = true;
-};
 
-// MODE SWITCH
-document.querySelectorAll("button[data-mode]").forEach(btn => {
-  btn.onclick = () => mode = Number(btn.dataset.mode);
+const stream=
+await navigator
+.mediaDevices
+.getUserMedia({
+audio:true
 });
 
-// VARIABLES
-let sRMS = 0, sBass = 0, sMid = 0, sTreble = 0;
-let sHue = 200;
+const audioCtx=
+new AudioContext();
 
-// MAIN LOOP
-function render(t = 0) {
-  requestAnimationFrame(render);
+analyser=
+audioCtx
+.createAnalyser();
 
-  ctx.fillStyle = "rgba(2,11,24,0.08)";
-  ctx.fillRect(0, 0, W, H);
+analyser.fftSize=2048;
 
-  if (running && analyser) {
-    analyser.getByteFrequencyData(dataArray);
-    analyser.getByteTimeDomainData(timeData);
+data=
+new Uint8Array(
+analyser.frequencyBinCount
+);
 
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-    let rms = sum / dataArray.length / 255;
+const source=
+audioCtx
+.createMediaStreamSource(
+stream
+);
 
-    let bass = dataArray.slice(0, 50).reduce((a,b)=>a+b,0)/50/255;
-    let mid  = dataArray.slice(200, 600).reduce((a,b)=>a+b,0)/400/255;
-    let treble = dataArray.slice(800, 1200).reduce((a,b)=>a+b,0)/400/255;
+source.connect(
+analyser
+);
 
-    const sm = 0.15;
-    sRMS = sRMS*(1-sm) + rms*sm*5;
-    sBass = sBass*(1-sm) + bass*sm*3;
-    sMid = sMid*(1-sm) + mid*sm*3;
-    sTreble = sTreble*(1-sm) + treble*sm*3;
+};
 
-    // COLOR (cool palette)
-    let targetHue = (sTreble * 200) + 160;
-    sHue = sHue * 0.8 + targetHue * 0.2;
-  }
 
-  if (mode === 0) drawLissajous(t);
-  if (mode === 1) drawMandala(t);
+function getAudio(){
+
+if(!analyser)
+return{
+vol:0,
+bass:0
+};
+
+analyser.getByteFrequencyData(
+data
+);
+
+let vol=0;
+let bass=0;
+
+
+for(
+let i=0;
+i<data.length;
+i++
+){
+
+vol+=data[i];
+
 }
+
+for(
+let i=0;
+i<40;
+i++
+){
+
+bass+=data[i];
+
+}
+
+vol/=
+data.length*255;
+
+bass/=
+40*255;
+
+return{
+vol,
+bass
+};
+
+}
+
+
+
+const blobs=[];
+
+for(
+let i=0;
+i<12;
+i++
+){
+
+blobs.push({
+
+angle:
+Math.random()
+*
+Math.PI
+*
+2,
+
+orbit:
+100+
+Math.random()
+*
+220,
+
+size:
+50+
+Math.random()
+*
+70,
+
+speed:
+(
+Math.random()
+-
+.5
+)
+*
+.01,
+
+offset:
+Math.random()
+*
+1000
+
+});
+
+}
+
+
+const particles=[];
+
+for(
+let i=0;
+i<150;
+i++
+){
+
+particles.push({
+
+x:
+Math.random()
+*W,
+
+y:
+Math.random()
+*H,
+
+size:
+Math.random()*4,
+
+speed:
+Math.random()*1.5
+
+});
+
+}
+
+
+
+let t=0;
+
+
+function render(){
+
+requestAnimationFrame(
+render
+);
+
+t+=.01;
+
+
+const audio=
+getAudio();
+
+
+// background fade
+
+ctx.fillStyle=
+"rgba(0,0,0,.08)";
+
+ctx.fillRect(
+0,
+0,
+W,
+H
+);
+
+
+// metallic liquid body
+
+ctx.globalCompositeOperation=
+"lighter";
+
+
+for(
+let b of blobs
+){
+
+
+b.angle+=
+b.speed*
+(
+1+
+audio.bass*6
+);
+
+
+let x=
+
+W/2+
+
+Math.cos(
+b.angle
+)
+*
+b.orbit;
+
+
+let y=
+
+H/2+
+
+Math.sin(
+b.angle
+)
+*
+b.orbit;
+
+
+let r=
+
+b.size+
+
+Math.sin(
+
+t*4+
+
+b.offset
+
+)
+
+*
+
+(
+30+
+audio.vol*100
+);
+
+
+
+let g=
+
+ctx.createRadialGradient(
+
+x-r*.4,
+y-r*.4,
+0,
+
+x,
+y,
+r
+
+);
+
+
+// realistic gold
+
+g.addColorStop(
+0,
+"#ffffff"
+);
+
+g.addColorStop(
+0.08,
+"#fff4d6"
+);
+
+g.addColorStop(
+0.25,
+"#ffe082"
+);
+
+g.addColorStop(
+0.5,
+"#d4af37"
+);
+
+g.addColorStop(
+0.7,
+"#8a6500"
+);
+
+g.addColorStop(
+1,
+"#120800"
+);
+
+
+
+ctx.shadowBlur=
+100;
+
+ctx.shadowColor=
+"#ffcf40";
+
+ctx.fillStyle=
+g;
+
+
+ctx.beginPath();
+
+for(
+let a=0;
+a<
+Math.PI*2;
+a+=.06
+){
+
+let wave=
+
+Math.sin(
+
+a*7+
+
+t*4+
+
+b.offset
+
+)
+
+*
+
+(
+25+
+audio.bass*100
+);
+
+
+let rr=
+r+wave;
+
+
+let px=
+x+
+Math.cos(a)
+*
+rr;
+
+
+let py=
+y+
+Math.sin(a)
+*
+rr;
+
+
+if(a===0){
+
+ctx.moveTo(
+px,
+py
+);
+
+}
+else{
+
+ctx.lineTo(
+px,
+py
+);
+
+}
+
+}
+
+
+ctx.closePath();
+
+ctx.fill();
+
+}
+
+
+// floating droplets
+
+for(
+let p of particles
+){
+
+p.y+=
+p.speed+
+audio.vol*3;
+
+if(
+p.y>
+H
+){
+
+p.y=0;
+p.x=
+Math.random()
+*
+W;
+
+}
+
+ctx.beginPath();
+
+ctx.fillStyle=
+"rgba(255,220,100,.8)";
+
+ctx.arc(
+
+p.x,
+p.y,
+
+p.size,
+
+0,
+
+Math.PI*2
+
+);
+
+ctx.fill();
+
+}
+
+
+ctx.globalCompositeOperation=
+"source-over";
+
+
+// reflective floor
+
+let reflection=
+
+ctx.createLinearGradient(
+0,
+H*.6,
+0,
+H
+);
+
+reflection.addColorStop(
+0,
+"rgba(255,180,0,.15)"
+);
+
+reflection.addColorStop(
+1,
+"transparent"
+);
+
+ctx.fillStyle=
+reflection;
+
+ctx.fillRect(
+0,
+H*.6,
+W,
+H
+);
+
+}
+
 
 render();
 
-// Lissajous
-function drawLissajous(t) {
-  ctx.beginPath();
-
-  let cx = W/2, cy = H/2;
-  for (let i = 0; i < 300; i++) {
-    let a = i / 300 * Math.PI * 2;
-    let x = cx + Math.sin(a * (2 + sBass*2)) * 200;
-    let y = cy + Math.sin(a * (3 + sTreble*2) + t*0.002) * 200;
-
-    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-  }
-
-  ctx.strokeStyle = `hsl(${sHue},90%,60%)`;
-  ctx.lineWidth = 2 + sRMS * 5;
-  ctx.stroke();
-}
-
-// Mandala
-function drawMandala(t) {
-  let cx = W/2, cy = H/2;
-  let petals = Math.round(5 + sTreble * 10);
-
-  for (let i = 0; i < petals; i++) {
-    let angle = i / petals * Math.PI * 2 + t * 0.001;
-
-    let len = 100 + sBass * 200;
-
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(
-      cx + Math.cos(angle) * len,
-      cy + Math.sin(angle) * len
-    );
-let intensity = Math.min(sRMS * 1.5, 1); // 0 → 1
-
-let red = 255;
-let green = Math.floor(255 * (1 - intensity));
-let blue = Math.floor(255 * (1 - intensity));
-
-ctx.strokeStyle = `rgb(${red}, ${green}, ${blue})`;
-ctx.lineWidth = 2 + sRMS * 5;
-ctx.stroke();
-  }
-}
 </script>
 
 </body>
+
 </html>
