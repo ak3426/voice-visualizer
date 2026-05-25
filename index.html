@@ -1,751 +1,267 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Molten Gold Voice Visualizer</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #030200;
+            height: 100%;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
 
-<meta charset="UTF-8">
-<title>Molten Gold Voice Visualizer</title>
+        canvas {
+            display: block;
+        }
 
-<style>
+        #ui {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            z-index: 100;
+            color: #d4af37;
+            pointer-events: none; /* Allows clicking through empty space */
+        }
 
-html,body{
-margin:0;
-padding:0;
-overflow:hidden;
-background:#000;
-height:100%;
-font-family:Arial,sans-serif;
-}
+        h1 {
+            margin: 0;
+            font-weight: 300;
+            font-size: 36px;
+            letter-spacing: 12px;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
 
-canvas{
-display:block;
-}
+        #subtitle {
+            margin-top: 8px;
+            font-size: 11px;
+            opacity: .7;
+            letter-spacing: 5px;
+        }
 
-#ui{
+        button {
+            margin-top: 30px;
+            padding: 14px 28px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(212, 175, 55, 0.6);
+            color: #d4af37;
+            cursor: pointer;
+            font-size: 11px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            transition: all 0.4s ease;
+            pointer-events: auto;
+            border-radius: 4px;
+        }
 
-position:absolute;
-top:35px;
-left:35px;
-z-index:100;
-color:#d4af37;
+        button:hover {
+            background: #d4af37;
+            color: #000;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
 
-}
-
-h1{
-
-margin:0;
-font-weight:200;
-font-size:38px;
-letter-spacing:10px;
-
-}
-
-#subtitle{
-
-margin-top:10px;
-font-size:11px;
-opacity:.6;
-letter-spacing:4px;
-
-}
-
-button{
-
-margin-top:25px;
-
-padding:14px 25px;
-
-background:transparent;
-
-border:1px solid rgba(212,175,55,.5);
-
-color:#d4af37;
-
-cursor:pointer;
-
-font-size:12px;
-
-letter-spacing:3px;
-
-transition:.3s;
-
-}
-
-button:hover{
-
-background:rgba(212,175,55,.15);
-
-}
-
-</style>
-
+        button.active {
+            opacity: 0.3;
+            border-color: rgba(212, 175, 55, 0.2);
+        }
+    </style>
 </head>
-
 <body>
 
 <div id="ui">
-
-<h1>MOLTEN GOLD</h1>
-
-<div id="subtitle">
-
-VOICE REACTIVE LIQUID METAL
-
-</div>
-
-<button id="startBtn">
-
-ACTIVATE MIC
-
-</button>
-
+    <h1>MOLTEN GOLD</h1>
+    <div id="subtitle">VOICE REACTIVE LIQUID METAL</div>
+    <button id="startBtn">Activate Mic</button>
 </div>
 
 <canvas id="canvas"></canvas>
 
 <script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const startBtn = document.getElementById("startBtn");
 
-const canvas=
-document.getElementById(
-"canvas"
-);
+let W, H;
+const TWO_PI = Math.PI * 2;
 
-const ctx=
-canvas.getContext(
-"2d"
-);
-
-let W,H;
-
-function resize(){
-
-W=
-canvas.width=
-window.innerWidth;
-
-H=
-canvas.height=
-window.innerHeight;
-
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
 }
-
 resize();
+window.addEventListener("resize", resize);
 
-window.addEventListener(
-"resize",
-resize
-);
-
-
-// AUDIO
-
+// AUDIO VARIABLE SETUP
 let analyser;
 let freqData;
+let audioContextCreated = false;
 
+startBtn.addEventListener("click", async () => {
+    if (audioContextCreated) return;
 
-document.getElementById(
-"startBtn"
-)
-.addEventListener(
-"click",
-async()=>{
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512; // Lower FFT size makes response punchier/faster
+        analyser.smoothingTimeConstant = 0.8;
+        
+        freqData = new Uint8Array(analyser.frequencyBinCount);
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
 
-const stream=
-
-await navigator
-.mediaDevices
-.getUserMedia({
-
-audio:true
-
+        startBtn.textContent = "Mic Connected";
+        startBtn.classList.add("active");
+        audioContextCreated = true;
+    } catch (err) {
+        console.error("Microphone access denied or error:", err);
+        startBtn.textContent = "Error Accessing Mic";
+    }
 });
 
-const audioCtx=
-new AudioContext();
+function getAudioData() {
+    if (!analyser) {
+        return { vol: 0, bass: 0, treble: 0 };
+    }
+    
+    analyser.getByteFrequencyData(freqData);
 
-analyser=
-audioCtx
-.createAnalyser();
+    let volSum = 0;
+    let bassSum = 0;
+    let trebleSum = 0;
+    
+    const totalBins = freqData.length;
+    const bassRange = Math.floor(totalBins * 0.15); // Bottom 15%
+    const trebleStart = Math.floor(totalBins * 0.45); // Top 55%
 
-analyser.fftSize=
-2048;
+    for (let i = 0; i < totalBins; i++) {
+        const val = freqData[i];
+        volSum += val;
+        if (i < bassRange) bassSum += val;
+        if (i >= trebleStart) trebleSum += val;
+    }
 
-analyser.smoothingTimeConstant=
-0.85;
-
-freqData=
-new Uint8Array(
-
-analyser.frequencyBinCount
-
-);
-
-const source=
-audioCtx
-.createMediaStreamSource(
-stream
-);
-
-source.connect(
-analyser
-);
-
-}
-);
-
-
-
-function getAudioData(){
-
-if(!analyser){
-
-return{
-
-vol:0,
-bass:0,
-treble:0
-
-};
-
+    // Properly normalized values ranging roughly from 0.0 to 1.0
+    return {
+        vol: (volSum / totalBins) / 255,
+        bass: (bassSum / bassRange) / 255,
+        treble: (trebleSum / (totalBins - trebleStart)) / 255
+    };
 }
 
-analyser.getByteFrequencyData(
-freqData
-);
+// PARTICLES ENGINE
+const particles = [];
+const PARTICLE_COUNT = 80;
 
-
-let vol=0;
-let bass=0;
-let treble=0;
-
-
-for(
-let i=0;
-i<freqData.length;
-i++
-){
-
-vol+=
-freqData[i];
-
+for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        size: Math.random() * 3 + 1,
+        speed: Math.random() * 1.2 + 0.4
+    });
 }
 
+let t = 0;
 
-for(
-let i=0;
-i<40;
-i++
-){
+function drawGold(cx, cy, audio) {
+    ctx.save();
+    
+    // Core sizing linked slightly to overall volume
+    let baseR = Math.min(W, H) * 0.20 + (audio.vol * 40);
 
-bass+=
-freqData[i];
+    // Dynamic glowing shadow based on intensity
+    ctx.shadowBlur = 40 + (audio.bass * 80);
+    ctx.shadowColor = `rgba(255, ${150 + audio.bass * 105}, 50, ${0.3 + audio.vol * 0.7})`;
 
+    // Metallic gradient mapped over the shape
+    let gradient = ctx.createRadialGradient(
+        cx - baseR * 0.4, cy - baseR * 0.4, 0,
+        cx, cy, baseR * 1.8
+    );
+
+    gradient.addColorStop(0, "#ffffff");
+    gradient.addColorStop(0.1, "#fff3be");
+    gradient.addColorStop(0.25, "#ffd24d");
+    gradient.addColorStop(0.5, "#d4af37");
+    gradient.addColorStop(0.75, "#8a6400");
+    gradient.addColorStop(1, "#1a0f00");
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+
+    const points = 240; // Reduced from 400 for better performance without visual quality loss
+    for (let i = 0; i <= points; i++) {
+        let angle = (i / points) * TWO_PI;
+
+        // Wave 1: Heavy Bass distorted liquid core
+        let wave1 = Math.sin(angle * 3 + t * 2.5) * (15 + audio.bass * 150);
+
+        // Wave 2: Treble high frequency ripples
+        let wave2 = Math.sin(angle * 12 - t * 4) * (5 + audio.treble * 40);
+
+        // Wave 3: Volume-based slow dynamic melting/stretching
+        let stretch = Math.cos(angle * 2 - t * 1.2) * (20 + audio.vol * 100);
+
+        // Dynamic downward-biased drips
+        let dripFactor = Math.max(0, Math.sin(angle + Math.PI / 2)); // Strongest at the bottom
+        let drip = dripFactor * Math.sin(angle * 6 + t * 3) * (audio.bass * 80);
+
+        let r = baseR + wave1 + wave2 + stretch + drip;
+
+        let x = cx + Math.cos(angle) * r;
+        let y = cy + Math.sin(angle) * r;
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+
+    ctx.closePath();
+    ctx.fill();
+
+    // Reflective Metallic Specular Arc Highlight
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+    ctx.lineWidth = 6 + (audio.treble * 5);
+    ctx.lineCap = "round";
+    ctx.moveTo(cx - baseR * 0.5, cy - baseR * 0.3);
+    ctx.quadraticCurveTo(cx, cy - baseR * 0.75, cx + baseR * 0.4, cy - baseR * 0.2);
+    ctx.stroke();
+
+    // Mercury-like Floating Droplets
+    const dropCount = 18;
+    for (let i = 0; i < dropCount; i++) {
+        let orbitAngle = i * (TWO_PI / dropCount) + (t * 0.4);
+        // Droplets extend outward depending heavily on bass and volume
+        let distance = baseR + 50 + (Math.sin(t + i) * 30) + (audio.bass * 160);
+
+        let x = cx + Math.cos(orbitAngle) * distance;
+        let y = cy + Math.sin(orbitAngle) * distance;
+
+        ctx.beginPath();
+        // Droplets shift colors dynamically based on individual audio frequency presence
+        ctx.fillStyle = audio.vol > 0.3 ? "#ffffff" : "#ffd700";
+        ctx.arc(x, y, 3 + (audio.treble * 12), 0, TWO_PI);
+        ctx.fill();
+    }
+
+    ctx.restore();
 }
 
-
-for(
-let i=200;
-i<500;
-i++
-){
-
-treble+=
-freqData[i];
-
-}
-
-
-vol/=
-freqData.length
-*
-255;
-
-bass/=
-40
-*
-255;
-
-treble/=
-300
-*
-255;
-
-
-return{
-
-vol,
-bass,
-treble
-
-};
-
-}
-
-
-
-// floating particles
-
-const particles=[];
-
-for(
-let i=0;
-i<60;
-i++
-){
-
-particles.push({
-
-x:
-Math.random()
-*
-window.innerWidth,
-
-y:
-Math.random()
-*
-window.innerHeight,
-
-size:
-Math.random()
-*
-4
-+
-1,
-
-speed:
-Math.random()
-*
-1.5
-
-});
-
-}
-
-
-
-let t=0;
-
-
-
-function drawGold(
-cx,
-cy,
-audio
-){
-
-ctx.save();
-
-ctx.shadowBlur=
-90;
-
-ctx.shadowColor=
-"#ffcc44";
-
-
-let baseR=
-
-Math.min(
-W,
-H
-)
-*
-0.22;
-
-
-
-let gradient=
-
-ctx.createRadialGradient(
-
-cx-baseR*.5,
-cy-baseR*.5,
-0,
-
-cx,
-cy,
-baseR*2
-
-);
-
-
-// Gold material
-
-gradient.addColorStop(
-0,
-"#ffffff"
-);
-
-gradient.addColorStop(
-0.06,
-"#fff9d7"
-);
-
-gradient.addColorStop(
-0.18,
-"#ffe082"
-);
-
-gradient.addColorStop(
-0.35,
-"#ffd700"
-);
-
-gradient.addColorStop(
-0.55,
-"#d4af37"
-);
-
-gradient.addColorStop(
-0.8,
-"#7c5a00"
-);
-
-gradient.addColorStop(
-1,
-"#120700"
-);
-
-
-ctx.fillStyle=
-gradient;
-
-
-ctx.beginPath();
-
-
-const points=
-400;
-
-
-for(
-let i=0;
-i<=points;
-i++
-){
-
-let angle=
-
-(i/points)
-*
-Math.PI
-*
-2;
-
-
-// primary shape
-
-let wave1=
-
-Math.sin(
-angle*3+
-t*2
-)
-*
-(
-25+
-audio.bass*120
-);
-
-
-// secondary detail
-
-let wave2=
-
-Math.sin(
-angle*8+
-t*5
-)
-*
-(
-10+
-audio.vol*60
-);
-
-
-// stretched liquid
-
-let stretch=
-
-Math.cos(
-angle*2-
-t
-)
-*
-(
-50+
-audio.bass*150
-);
-
-
-// drips
-
-let drip=
-
-Math.max(
-
-0,
-
-Math.sin(
-angle*7+
-t*4
-)
-
-)
-
-*
-audio.vol
-*
-100;
-
-
-let r=
-
-baseR+
-
-wave1+
-
-wave2+
-
-stretch+
-
-drip;
-
-
-let x=
-
-cx+
-
-Math.cos(
-angle
-)
-*
-r;
-
-
-let y=
-
-cy+
-
-Math.sin(
-angle
-)
-*
-r;
-
-
-
-if(i===0){
-
-ctx.moveTo(
-x,
-y
-);
-
-}
-else{
-
-ctx.lineTo(
-x,
-y
-);
-
-}
-
-}
-
-ctx.closePath();
-
-ctx.fill();
-
-
-
-// reflective metallic streak
-
-ctx.beginPath();
-
-ctx.strokeStyle=
-"rgba(255,255,255,.6)";
-
-ctx.lineWidth=
-10;
-
-
-ctx.moveTo(
-
-cx-baseR*.6,
-
-cy-baseR*.35
-
-);
-
-ctx.quadraticCurveTo(
-
-cx,
-
-cy-baseR*.8,
-
-cx+baseR*.5,
-
-cy-baseR*.2
-
-);
-
-ctx.stroke();
-
-
-
-// droplets
-
-for(
-let i=0;
-i<25;
-i++
-){
-
-let a=
-i*.4+t;
-
-let d=
-baseR+
-Math.sin(
-t+i
-)
-*
-120;
-
-
-let x=
-
-cx+
-Math.cos(a)
-*d;
-
-
-let y=
-
-cy+
-Math.sin(a)
-*d;
-
-
-ctx.beginPath();
-
-ctx.fillStyle=
-"#ffd24d";
-
-ctx.arc(
-
-x,
-y,
-
-2+
-audio.treble*8,
-
-0,
-Math.PI*2
-
-);
-
-ctx.fill();
-
-}
-
-
-ctx.restore();
-
-}
-
-
-
-function animate(){
-
-requestAnimationFrame(
-animate
-);
-
-t+=0.01;
-
-
-let audio=
-getAudioData();
-
-
-// smooth trail effect
-
-ctx.fillStyle=
-"rgba(0,0,0,.08)";
-
-ctx.fillRect(
-0,
-0,
-W,
-H
-);
-
-
-// center sculpture
-
-drawGold(
-
-W/2,
-H/2,
-audio
-
-);
-
-
-// particles
-
-for(
-let p of particles
-){
-
-p.y+=
-p.speed+
-audio.vol*3;
-
-
-if(
-p.y>
-H
-){
-
-p.y=0;
-
-p.x=
-Math.random()
-*W;
-
-}
-
-
-ctx.beginPath();
-
-ctx.fillStyle=
-"rgba(255,215,0,.7)";
-
-ctx.arc(
-
-p.x,
-p.y,
-
-p.size,
-
-0,
-Math.PI*2
-
-);
-
-ctx.fill();
-
-}
-
-}
-
-
-animate();
-
-</script>
-
-</body>
-</html>
+function animate() {
+    requestAnimationFrame(animate);
+    
+    // Global time modifier
+    t += 0.015;
+
+    let audio = getAudioData();
+
+    // Smooth trail effect (Lower opacity = longer ghosting trail)
+    ctx.fillStyle = "rgba(3, 2, 0, 0.12)";
+    ctx.fillRect(0, 0, W, H);
+
+    // Render center liquid gold sculpture
+    drawGold(W / 2, H / 2, audio);
